@@ -14,10 +14,10 @@ export const demos: { name: string; items: Item[] }[] = [
     name: 'Capabilities',
     items: [
       {
-        name: 'Sound effects',
+        name: 'Chatbox',
         icon: Sparkles,
-        slug: 'sound-effects',
-        description: 'Turn text into cinematic sound effects.',
+        slug: 'chatbox',
+        description: 'chatbox',
       },
     ],
   },

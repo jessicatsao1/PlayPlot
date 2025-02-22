@@ -45,7 +45,7 @@ export default function Page() {
       <div className="container mx-auto">
         <div className="grid h-[600px] grid-cols-[1fr_auto_300px]">
           <div className="bg-card flex flex-col rounded-lg p-6">
-            <h1 className="text-2xl font-bold">Sound Effects</h1>
+            <h1 className="text-2xl font-bold">Chatbox</h1>
             <div className="flex flex-1 flex-col justify-center">
               {selectedEffect ? (
                 <div className="space-y-4">
