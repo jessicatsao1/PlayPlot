@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { generateSoundEffect } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -21,16 +20,11 @@ import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SoundEffectInput, soundEffectSchema } from '@/lib/schemas';
-import type { GeneratedSoundEffect } from '@/types';
 
 type InputSoundEffectProps = {
-  onPendingEffect: (prompt: string) => string;
-  onUpdatePendingEffect: (id: string, effect: GeneratedSoundEffect) => void;
 };
 
 export function InputSoundEffect({
-  onPendingEffect,
-  onUpdatePendingEffect,
 }: InputSoundEffectProps) {
   const form = useForm<SoundEffectInput>({
     resolver: zodResolver(soundEffectSchema),
@@ -47,24 +41,6 @@ export function InputSoundEffect({
     try {
       setIsGenerating(true);
 
-      const duration = data.duration_seconds === 'auto' ? 'auto' : data.duration_seconds;
-      const result = await generateSoundEffect(data.text, duration, data.prompt_influence);
-
-      if (result.ok) {
-        const pendingId = onPendingEffect(data.text);
-        const effect: GeneratedSoundEffect = {
-          id: pendingId,
-          prompt: data.text,
-          audioBase64: result.value.audioBase64,
-          createdAt: new Date(),
-          status: 'complete',
-        };
-        onUpdatePendingEffect(pendingId, effect);
-        toast.success('Generated sound effect');
-        form.reset();
-      } else {
-        toast.error(result.error);
-      }
     } catch (err) {
       toast.error(`An unexpected error occurred: ${err}`);
     } finally {
@@ -96,7 +72,7 @@ export function InputSoundEffect({
             })}
             disabled={isGenerating}
             className="placeholder:text-token-text-secondary scrollbar-hide flex max-h-[80vh] w-full rounded-md border-0 bg-transparent px-3 pb-4 pt-3 text-sm focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 max-md:flex-1"
-            placeholder="Describe your sound effect..."
+            placeholder="Describe your story..."
             rows={1}
             style={{
               overflowY: 'auto',
