@@ -2,7 +2,9 @@ import pytest
 from io import BytesIO
 import os
 from unittest.mock import Mock, patch
-from src.models.elevenlabs_tts import ElevenLabsTTS, ElevenLabsError
+from elevenlabs_tts import ElevenLabsTTS, ElevenLabsError
+import unittest
+from elevenlabs_tts import generate_couple_argument
 
 @pytest.fixture
 def tts_client():
@@ -139,4 +141,79 @@ def test_get_available_voices_error(mock_get, tts_client):
     
     with pytest.raises(ElevenLabsError) as exc_info:
         tts_client.get_available_voices()
-    assert "Failed to get voices" in str(exc_info.value) 
+    assert "Failed to get voices" in str(exc_info.value)
+
+class TestElevenLabsTTS(unittest.TestCase):
+    def setUp(self):
+        """Set up test fixtures"""
+        self.config = {
+            "model_id": "eleven_multilingual_v2",
+            "stability": 0.5,
+            "similarity_boost": 0.75
+        }
+        self.tts_client = ElevenLabsTTS(self.config)
+        self.test_output_dir = "test_outputs"
+        
+        # Create output directory if it doesn't exist
+        if not os.path.exists(self.test_output_dir):
+            os.makedirs(self.test_output_dir)
+
+    def test_generate_couple_argument(self):
+        """Test generating a couple's argument audio"""
+        output_path = os.path.join(self.test_output_dir, "test_couple_argument.mp3")
+        
+        try:
+            # Generate the argument audio
+            generate_couple_argument(self.tts_client, output_path)
+            
+            # Check if file was created
+            self.assertTrue(os.path.exists(output_path))
+            
+            # Check if file has content
+            self.assertGreater(os.path.getsize(output_path), 0)
+            
+            print(f"\nArgument audio generated successfully at: {output_path}")
+            
+        except Exception as e:
+            self.fail(f"Failed to generate couple argument: {str(e)}")
+
+    def test_individual_voice_generation(self):
+        """Test generating individual voice lines"""
+        test_lines = [
+            {
+                "voice_id": "21m00Tcm4TlvDq8ikWAM",  # Josh
+                "text": "This is a test for the male voice.",
+                "output": "male_test.mp3"
+            },
+            {
+                "voice_id": "EXAVITQu4vr4xnSDxMaL",  # Rachel
+                "text": "This is a test for the female voice.",
+                "output": "female_test.mp3"
+            }
+        ]
+
+        for line in test_lines:
+            output_path = os.path.join(self.test_output_dir, line["output"])
+            
+            try:
+                # Generate speech for each test line
+                audio_data = self.tts_client.text_to_speech(
+                    text=line["text"],
+                    voice_id=line["voice_id"]
+                )
+                
+                # Save the audio
+                with open(output_path, 'wb') as f:
+                    f.write(audio_data.getvalue())
+                
+                # Verify file creation
+                self.assertTrue(os.path.exists(output_path))
+                self.assertGreater(os.path.getsize(output_path), 0)
+                
+                print(f"\nTest audio generated successfully at: {output_path}")
+                
+            except Exception as e:
+                self.fail(f"Failed to generate test audio for {line['output']}: {str(e)}")
+
+if __name__ == '__main__':
+    unittest.main() 
