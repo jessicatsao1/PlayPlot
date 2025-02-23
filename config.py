@@ -1,10 +1,25 @@
 from enum import Enum
 from typing import Dict, Any
+import os
+from pydantic import BaseModel
 
-class LLMProvider(Enum):
-    PERPLEXITY = "perplexity"
+class LLMProvider(str, Enum):
+    OPENAI = "openai"
     GROQ = "groq"
+    OAI_CUSTOM = "oai_custom"
+    SCALEWAY = "scaleway"
+    ALIYUN = "aliyun"
+    GROK = "grok"
     MISTRAL = "mistral"
+    PERPLEXITY = "perplexity"
+
+# Add video provider enum
+class VideoProvider(str, Enum):
+    FAL_SKYREELS = "fal-ai/skyreels-i2v"
+    FAL_PIXVERSE = "fal-ai/pixverse/v3.5/image-to-video/fast"
+    FAL_MINIMAX = "fal-ai/minimax-video"
+    FAL_LUMA = "fal-ai/luma-dream-machine"
+    FAL_KLING = "fal-ai/kling-video/v1/standard"
 
 class AgentType(Enum):
     MANAGER = "manager"
@@ -126,8 +141,79 @@ ERROR_MESSAGES = {
 # API endpoints
 API_ENDPOINTS = {
     "perplexity": "https://api.perplexity.ai/chat/completions",
-    "groq": "https://api.groq.com/v1/chat/completions",
-    "mistral": "https://api.mistral.ai/v1/chat/completions"
+    "groq": "https://api.groq.com/openai/v1/chat/completions",
+    "mistral": "https://api.mistral.ai/v1/chat/completions",
+    "fal_video": {
+        "skyreels": "fal-ai/skyreels-i2v",
+        "pixverse": "fal-ai/pixverse/v3.5/image-to-video/fast",
+        "minimax": "fal-ai/minimax-video",
+        "luma": "fal-ai/luma-dream-machine",
+        "kling": "fal-ai/kling-video/v1/standard"
+    }
+}
+
+# Add video configuration
+VIDEO_MODELS = {
+    "skyreels": {
+        "provider": VideoProvider.FAL_SKYREELS,
+        "endpoint": "skyreels",
+        "settings": {
+            "guidance_scale": 6.0,
+            "num_inference_steps": 30,
+            "aspect_ratio": "16:9"
+        }
+    },
+    "pixverse": {
+        "provider": VideoProvider.FAL_PIXVERSE,
+        "endpoint": "pixverse",
+        "settings": {
+            "guidance_scale": 6.0,
+            "num_inference_steps": 30,
+            "aspect_ratio": "16:9",
+            "resolution": "720p"
+        }
+    },
+    "minimax": {
+        "provider": VideoProvider.FAL_MINIMAX,
+        "endpoint": "minimax",
+        "settings": {
+            "guidance_scale": 6.0,
+            "num_inference_steps": 30,
+            "aspect_ratio": "16:9"
+        }
+    },
+    "luma": {
+        "provider": VideoProvider.FAL_LUMA,
+        "endpoint": "luma",
+        "settings": {
+            "guidance_scale": 6.0,
+            "num_inference_steps": 30,
+            "aspect_ratio": "16:9"
+        }
+    },
+    "kling": {
+        "provider": VideoProvider.FAL_KLING,
+        "endpoint": "kling",
+        "settings": {
+            "guidance_scale": 6.0,
+            "num_inference_steps": 30,
+            "aspect_ratio": "16:9"
+        }
+    }
+}
+
+# Add video agent configuration with default settings
+VIDEO_AGENT_CONFIG = {
+    "primary": {
+        "provider": VideoProvider.FAL_SKYREELS,
+        "model": "skyreels",
+        "settings": VIDEO_MODELS["skyreels"]["settings"]
+    },
+    "fallback": {
+        "provider": VideoProvider.FAL_PIXVERSE,
+        "model": "pixverse",
+        "settings": VIDEO_MODELS["pixverse"]["settings"]
+    }
 }
 
 # Default parameters
@@ -136,4 +222,70 @@ DEFAULT_PARAMS = {
     "backoff_factor": 2,
     "timeout": 60,
     "chunk_size": 2000
-} 
+}
+
+# Add provider timeouts
+PROVIDER_TIMEOUTS = {
+    LLMProvider.PERPLEXITY: 60,
+    LLMProvider.GROQ: 60,
+    LLMProvider.MISTRAL: 60
+}
+
+class APIConfig(BaseModel):
+    """API Configuration Settings"""
+    # ... existing fields ...
+
+    # FAL AI Video Configuration
+    fal_api_key: str = os.getenv("FAL_API_KEY")
+    video_model: str = VIDEO_AGENT_CONFIG["primary"]["model"]
+    video_settings: Dict[str, Any] = VIDEO_AGENT_CONFIG["primary"]["settings"]
+    video_fallback_model: str = VIDEO_AGENT_CONFIG["fallback"]["model"]
+    video_fallback_settings: Dict[str, Any] = VIDEO_AGENT_CONFIG["fallback"]["settings"]
+
+    @classmethod
+    def load_from_env(cls) -> 'APIConfig':
+        """Load configuration from environment variables"""
+        return cls(
+            fal_api_key=os.getenv("FAL_API_KEY"),
+            video_model=VIDEO_AGENT_CONFIG["primary"]["model"],
+            video_settings=VIDEO_AGENT_CONFIG["primary"]["settings"].copy(),
+            video_fallback_model=VIDEO_AGENT_CONFIG["fallback"]["model"],
+            video_fallback_settings=VIDEO_AGENT_CONFIG["fallback"]["settings"].copy()
+        )
+
+    def get_video_config(self, use_fallback: bool = False) -> Dict[str, Any]:
+        """Get video generation configuration"""
+        model_key = self.video_fallback_model if use_fallback else self.video_model
+        model_config = VIDEO_MODELS[model_key]
+        
+        if not self.fal_api_key:
+            raise ValueError("FAL API key not found in environment variables")
+            
+        # Get endpoint path
+        endpoint = API_ENDPOINTS["fal_video"][model_config["endpoint"]]
+            
+        return {
+            "provider": model_config["provider"].value,
+            "api_key": self.fal_api_key,
+            "settings": self.video_fallback_settings if use_fallback else self.video_settings,
+            "endpoint": endpoint
+        }
+
+    def set_video_model(self, model_name: str, is_fallback: bool = False) -> None:
+        """Set video model and its settings"""
+        if model_name not in VIDEO_MODELS:
+            raise ValueError(f"Invalid video model: {model_name}")
+            
+        if is_fallback:
+            self.video_fallback_model = model_name
+            self.video_fallback_settings = VIDEO_MODELS[model_name]["settings"].copy()
+        else:
+            self.video_model = model_name
+            self.video_settings = VIDEO_MODELS[model_name]["settings"].copy()
+
+    def update_video_settings(self, settings: Dict[str, Any], is_fallback: bool = False) -> None:
+        """Update video settings"""
+        target_settings = self.video_fallback_settings if is_fallback else self.video_settings
+        target_settings.update(settings)
+
+# ... rest of the existing code ... 

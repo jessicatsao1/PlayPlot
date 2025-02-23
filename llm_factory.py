@@ -1,7 +1,7 @@
 from typing import Dict, Any, Optional, List, Type
 import logging
 import aiohttp
-from config import LLMProvider, LLM_CONFIG, AgentType, PROMPT_TEMPLATES
+from config import LLMProvider, LLM_CONFIG, AgentType, PROMPT_TEMPLATES, API_ENDPOINTS
 from custom_llm_perplexity import PerplexityLLM
 from custom_llm_groq import GroqLLM
 from custom_llm_mistral import MistralLLM
@@ -155,19 +155,18 @@ class LLMManager:
         """Execute LLM call with fallback strategy"""
         config = LLM_CONFIG[agent_type]
         
-        # Try primary model (Groq)
+        # Try primary model
         try:
-            chat_completion = self.groq_client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": prompt}
-                ],
-                model=config["primary"]["model"],
-                temperature=config["primary"]["temperature"],
-                max_tokens=config["primary"]["max_tokens"]
-            )
+            if config["primary"]["provider"] == LLMProvider.GROQ:
+                result = await self._call_groq(prompt, system_message, config["primary"])
+            elif config["primary"]["provider"] == LLMProvider.PERPLEXITY:
+                result = await self._call_perplexity(prompt, system_message, config["primary"])
+            elif config["primary"]["provider"] == LLMProvider.MISTRAL:
+                result = await self._call_mistral(prompt, system_message, config["primary"])
+            else:
+                raise LLMError(f"Unsupported primary provider: {config['primary']['provider']}")
             
-            content = chat_completion.choices[0].message.content
+            content = result["choices"][0]["message"]["content"]
             logger.debug(f"Raw LLM response:\n{content}")
             
             # Validate response based on type
@@ -178,25 +177,26 @@ class LLMManager:
             
             return {
                 "content": content,
-                "provider": "groq",
-                "usage": {
-                    "prompt_tokens": chat_completion.usage.prompt_tokens,
-                    "completion_tokens": chat_completion.usage.completion_tokens
-                }
+                "provider": config["primary"]["provider"].value,
+                "usage": result.get("usage", {})
             }
+            
         except Exception as e:
-            logger.error(f"Primary model (Groq) failed: {str(e)}")
+            logger.error(f"Primary model failed: {str(e)}")
             
             # Try fallback model
             try:
-                result = await self._call_mistral(
-                    prompt=prompt,
-                    system_message=system_message,
-                    config=config["fallback"]
-                )
+                if config["fallback"]["provider"] == LLMProvider.GROQ:
+                    result = await self._call_groq(prompt, system_message, config["fallback"])
+                elif config["fallback"]["provider"] == LLMProvider.PERPLEXITY:
+                    result = await self._call_perplexity(prompt, system_message, config["fallback"])
+                elif config["fallback"]["provider"] == LLMProvider.MISTRAL:
+                    result = await self._call_mistral(prompt, system_message, config["fallback"])
+                else:
+                    raise LLMError(f"Unsupported fallback provider: {config['fallback']['provider']}")
                 
                 content = result["choices"][0]["message"]["content"]
-                logger.debug(f"Raw Mistral response:\n{content}")
+                logger.debug(f"Raw fallback response:\n{content}")
                 
                 # Validate response based on type
                 if response_type == "story_analysis":
@@ -206,15 +206,70 @@ class LLMManager:
                 
                 return {
                     "content": content,
-                    "provider": "mistral",
-                    "usage": {
-                        "prompt_tokens": result["usage"]["prompt_tokens"],
-                        "completion_tokens": result["usage"]["completion_tokens"]
-                    }
+                    "provider": config["fallback"]["provider"].value,
+                    "usage": result.get("usage", {})
                 }
+                
             except Exception as e2:
                 logger.error(f"Fallback model failed: {str(e2)}")
                 raise LLMError(f"Both primary and fallback models failed: {str(e)} | {str(e2)}")
+
+    async def _call_groq(
+        self,
+        prompt: str,
+        system_message: str,
+        config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Call Groq API"""
+        chat_completion = self.groq_client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": prompt}
+            ],
+            model=config["model"],
+            temperature=config["temperature"],
+            max_tokens=config["max_tokens"]
+        )
+        return {
+            "choices": [{"message": {"content": chat_completion.choices[0].message.content}}],
+            "usage": {
+                "prompt_tokens": chat_completion.usage.prompt_tokens,
+                "completion_tokens": chat_completion.usage.completion_tokens
+            }
+        }
+
+    async def _call_perplexity(
+        self,
+        prompt: str,
+        system_message: str,
+        config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Call Perplexity API"""
+        headers = {
+            "Authorization": f"Bearer {self.api_keys[LLMProvider.PERPLEXITY]}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "model": config["model"],
+            "messages": [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": config["temperature"],
+            "max_tokens": config["max_tokens"]
+        }
+        
+        async with self.session.post(
+            API_ENDPOINTS["perplexity"],
+            headers=headers,
+            json=data,
+            timeout=config["timeout"]
+        ) as response:
+            if response.status != 200:
+                error_text = await response.text()
+                raise LLMError(f"Perplexity API error: {response.status} - {error_text}")
+            return await response.json()
 
     async def _call_mistral(
         self,
@@ -239,7 +294,7 @@ class LLMManager:
         }
         
         async with self.session.post(
-            "https://api.mistral.ai/v1/chat/completions",
+            API_ENDPOINTS["mistral"],
             headers=headers,
             json=data,
             timeout=config["timeout"]
