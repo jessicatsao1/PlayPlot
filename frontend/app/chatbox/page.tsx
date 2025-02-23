@@ -2,151 +2,140 @@
 
 import {useState, useEffect} from 'react';
 
-import {InputSoundEffect} from '@/components/input-sound-effect';
+import {InputSoundEffect} from '@/app/chatbox/components/InputEffect';
 import {ScrollArea} from '@/components/ui/scroll-area';
 import {cn} from '@/lib/utils';
+import Message from './components/Message';
+import VideoPlayer from './components/VideoPlayer';
+import ImagePlayer from './components/ImagePlayer';
 
 export default function Page() {
   const [firstIn, setFirstIn] = useState(true);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(1);
 
-  useEffect(() => {
-    const videoElement = document.querySelector('video');
-    if (videoElement) {
-      videoElement.volume = volume;
-    }
-  }, [volume]);
+  const [messages, setMessages] = useState([
+    {
+      content: '這是一個故事消息！',
+      timestamp: '02:33',
+      isSender: true,
+      type: 'message'
+    },
+    {
+      content: '這是一個故事消息！',
+      timestamp: '02:33',
+      isSender: false,
+      type: 'message',
+      storyId: 'story_1',
+      sceneNumber: 1,
+      text: '這是故事的內容。',
+      metadata: {word_count: 10, tone: 'neutral', emotional_context: 'calm', setting_description: '一個寧靜的公園'},
+    },
+    {
+      status: 'success',
+      story_id: 'story_1',
+      scene_id: 'scene_1',
+      isSender: false,
+      timestamp: '02:33',
+      type: 'media',
+      media: {
+        images: [{
+          url: '/resource/sample-img.png',
+          thumbnail_url: '/resource/story-image-thumbnail.png',
+          prompt_used: '故事場景',
+          style: '插畫',
+          metadata: {width: 800, height: 600, model: 'model_v1', seed: 12345}
+        }],
+        audio: [{
+          url: '/resource/audioplayback.m4a',
+          duration: 120,
+          speaker: {character_id: 'char_1', voice_id: 'voice_1', emotion: 'happy'},
+          metadata: {format: 'mp3', sample_rate: 44100}
+        }],
+      },
+    },
+    {
+      status: 'success',
+      story_id: 'story_1',
+      scene_id: 'scene_1',
+      isSender: false,
+      timestamp: '02:33',
+      type: 'video',
+      text: '這是故事的內容。',
+      media: {
+        video: {
+          url: '/resource/videoplayback.mp4',
+          thumbnail_url: '/resource/story-video-thumbnail.png',
+          duration: 180,
+          metadata: {resolution: '1080p', fps: 30, format: 'mp4'}
+        }
+      },
+    },
+  ]);
+
+  const [buttonConfigs, setButtonConfigs] = useState([
+    {id: '1', label: 'Step 1', value: 'Step 1'},
+    {id: '2', label: 'Step 2', value: 'Step 2'},
+    {id: '3', label: 'Step 3', value: 'Step 3'},
+  ]);
 
   return (
     <div>
       {firstIn ? (
         <div className="container mx-auto">
           <div className="bg-card flex flex-col rounded-lg p-6 h-[calc(100vh-320px)]">
-            <div className="flex flex-1 flex-col justify-center">
+            <div className="flex flex-1 flex-col justify-center  overflow-y-auto">
               <div className="space-y-4 h-full">
-                <ScrollArea className="h-full w-full rounded-md border p-4">
+                <ScrollArea className="h-full w-full rounded-md border p-4 ">
                   <div className="space-y-4">
-                    {/* 發送者的消息 */}
-                    <div className="flex justify-end">
-                      <div className="max-w-[70%] rounded-lg bg-primary px-4 py-2 text-primary-foreground">
-                        <p>嗨！這是一條測試消息</p>
-                        <div className="mt-1 text-right text-xs opacity-70">
-                          02:30
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 接收者的消息 */}
-                    <div className="flex justify-start">
-                      <div className="max-w-[70%] rounded-lg bg-muted px-4 py-2">
-                        <p>你好！這是回覆消息！你好！這是回覆消息！你好！這是回覆消息！你好！這是回覆消息！</p>
-                        <div className="mt-1 text-left text-xs opacity-70">
-                          02:31
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-start">
-                        <div className="w-[45%] rounded-lg bg-muted p-2">
-                          <div className="relative aspect-[9/16] overflow-hidden rounded-lg">
-                            <video
-                              className="absolute inset-0 w-full h-full object-cover"
-                              controls={false}
-                              src="/sample-video.mp4"
-                              muted={isMuted}
-                            />
-                            <div
-                              className="absolute top-2 right-1 flex items-center gap-2 bg-black/60 backdrop-blur-sm p-2 rounded-lg">
-                              <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.1"
-                                value={volume}
-                                onChange={(e) => setVolume(Number(e.target.value))}
-                                className="w-20 h-1 bg-white rounded-md appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
-                              />
-                              <button
-                                onClick={() => setIsMuted(!isMuted)}
-                                className="text-white/70 hover:text-white"
-                              >
-                                {isMuted ? (
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                       fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-                                       strokeLinejoin="round">
-                                    <path d="M11 5 6 9H2v6h4l5 4V5Z"/>
-                                    <line x1="23" y1="9" x2="17" y2="15"/>
-                                    <line x1="17" y1="9" x2="23" y2="15"/>
-                                  </svg>
-                                ) : (
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                       fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-                                       strokeLinejoin="round">
-                                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-                                  </svg>
-                                )}
-                              </button>
-                            </div>
-                            <div className={cn(
-                              "absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm p-3 transition-all duration-300",
-                              isExpanded ? "h-[50%]" : "h-[25%]"
-                            )}>
-                              <div className="h-full">
-                                <div className={cn(
-                                  "text-white h-[calc(100%-20px)] overflow-y-auto"
-                                )}>
-                                  <p className={cn(
-                                    "text-xs text-white/70",
-                                    !isExpanded ? "line-clamp-5" : ""
-                                  )}>
-                                    這是一段視頻描述文本，可以展示視頻的相關信息和簡介。如果文本過長會自動截斷。這是一段視頻描述文本，可以展示視頻的相關信息和簡介。如果文本過長會自動截斷。
-                                    這是一段視頻描述文本，可以展示視頻的相關信息和簡介。如果文本過長會自動截斷。這是一段視頻描述文本，可以展示視頻的相關信息和簡介。如果文本過長會自動截斷。
-                                    這是一段視頻描述文本，可以展示視頻的相關信息和簡介。如果文本過長會自動截斷。這是一段視頻描述文本，可以展示視頻的相關信息和簡介。如果文本過長會自動截斷。
-                                    這是一段視頻描述文本，可以展示視頻的相關信息和簡介。如果文本過長會自動截斷。這是一段視頻描述文本，可以展示視頻的相關信息和簡介。如果文本過長會自動截斷。
-                                    這是一段視頻描述文本，可以展示視頻的相關信息和簡介。如果文本過長會自動截斷。這是一段視頻描述文本，可以展示視頻的相關信息和簡介。如果文本過長會自動截斷。
-                                  </p>
-                                </div>
-                                <button
-                                  onClick={() => setIsExpanded(!isExpanded)}
-                                  className="text-xs text-white/50 hover:text-white/80 absolute bottom-3 left-3"
-                                >
-                                  {isExpanded ? 'Show less' : 'Show more'}
-                                </button>
-                              </div>
+                    {messages.map((msg, index) => (
+                      <div key={index} className="space-y-2">
+                        {msg.type === 'message' ? (
+                          <Message
+                            content={msg.content || ''}
+                            timestamp={msg.timestamp || ''}
+                            isSender={msg.isSender}
+                          />
+                        ) : (
+                          <div className="flex justify-start">
+                            <div className="w-[45%] rounded-lg p-2">
+                              {msg.type === 'video' ? (
+                                <VideoPlayer
+                                  media={msg.media as {
+                                    video: {
+                                      url: string;
+                                      thumbnail_url: string;
+                                      duration: number;
+                                      metadata: { resolution: string; fps: number; format: string; };
+                                    };
+                                  }}
+                                  timestamp={msg.timestamp}
+                                  description={msg.text || ''}
+                                />
+                              ) : (
+                                <ImagePlayer
+                                  media={msg.media as {
+                                    images: {
+                                      url: string;
+                                      thumbnail_url: string;
+                                      prompt_used: string;
+                                      style: string;
+                                      metadata: { width: number; height: number; model: string; seed: number; };
+                                    }[];
+                                    audio?: {
+                                      url: string;
+                                      duration: number;
+                                      speaker: { character_id: string; voice_id: string; emotion: string; };
+                                      metadata: { format: string; sample_rate: number; };
+                                    }[];
+                                  }}
+                                  timestamp={msg.timestamp}
+                                  description={msg.text || ''}
+                                />
+                              )}
                             </div>
                           </div>
-                          <div className="mt-1 text-left text-xs opacity-70">
-                            02:32
-                          </div>
-                        </div>
+                        )}
                       </div>
-
-                      <div className="w-[45%] space-y-1">
-                        <div className="flex w-full gap-1">
-                          <button
-                            className="flex-1 px-3 py-2 text-xs rounded-md bg-muted-foreground/10 hover:bg-muted-foreground/20">
-                            U1
-                          </button>
-                          <button
-                            className="flex-1 px-3 py-2 text-xs rounded-md bg-muted-foreground/10 hover:bg-muted-foreground/20">
-                            U2
-                          </button>
-                          <button
-                            className="flex-1 px-3 py-2 text-xs rounded-md bg-muted-foreground/10 hover:bg-muted-foreground/20">
-                            U3
-                          </button>
-                          <button
-                            className="flex-1 px-3 py-2 text-xs rounded-md bg-muted-foreground/10 hover:bg-muted-foreground/20">
-                            U4
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </ScrollArea>
               </div>
@@ -161,7 +150,7 @@ export default function Page() {
         )}
       >
         <div className="mx-auto max-w-4xl h-full flex flex-col justify-center">
-          <InputSoundEffect/>
+          <InputSoundEffect buttons={buttonConfigs}/>
         </div>
       </div>
     </div>

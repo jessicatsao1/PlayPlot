@@ -151,3 +151,9 @@ body {
   background-size: auto;
   border-style: none;
 }
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
