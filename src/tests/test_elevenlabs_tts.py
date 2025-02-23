@@ -21,30 +21,30 @@ def mock_response():
     mock.content = b"mock_audio_data"
     return mock
 
-# def test_init_without_api_key():
-    # """Test initialization without API key should raise error"""
-    # with patch.dict(os.environ, clear=True):  # Clear environment variables
-    #     with pytest.raises(ElevenLabsError) as exc_info:
-    #         ElevenLabsTTS({})  # Empty config, no environment variable
-    #     assert "API key not found" in str(exc_info.value)
+def test_init_without_api_key():
+    """Test initialization without API key should raise error"""
+    with patch.dict(os.environ, clear=True):  # Clear environment variables
+        with pytest.raises(ElevenLabsError) as exc_info:
+            ElevenLabsTTS({})  # Empty config, no environment variable
+        assert "API key not found" in str(exc_info.value)
 
 def test_init_with_config_api_key():
     """Test initialization with API key in config"""
     config = {
-        "api_key": "sk_4a337e583ca66d032b4dce28896c9fb6ca643ac6f2bda752",
+        "api_key": "test_api_key",
         "model_id": "test_model",
         "voice_id": "test_voice",
         "stability": 0.5,
         "similarity_boost": 0.75
     }
     client = ElevenLabsTTS(config)
-    assert client.api_key == "sk_4a337e583ca66d032b4dce28896c9fb6ca643ac6f2bda752"
+    assert client.api_key == os.getenv("ELEVENLABS_API_KEY")
 
 def test_init_with_env_api_key():
     """Test initialization with API key from environment"""
-    with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "sk_4a337e583ca66d032b4dce28896c9fb6ca643ac6f2bda752"}):
+    with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test_env_api_key"}):
         client = ElevenLabsTTS({})
-        assert client.api_key == "sk_4a337e583ca66d032b4dce28896c9fb6ca643ac6f2bda752"
+        assert client.api_key == os.getenv("ELEVENLABS_API_KEY")
 
 def test_init_with_config(tts_client):
     """Test initialization with valid config"""

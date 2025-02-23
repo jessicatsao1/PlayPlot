@@ -23,7 +23,7 @@ class ElevenLabsTTS:
                 - similarity_boost (optional): Voice similarity boost (0-1)
                 - api_key (optional): ElevenLabs API key. If not provided, will look for ELEVENLABS_API_KEY in environment
         """
-        self.api_key = 'sk_4a337e583ca66d032b4dce28896c9fb6ca643ac6f2bda752'
+        self.api_key = os.getenv("ELEVENLABS_API_KEY")
         if not self.api_key:
             raise ElevenLabsError("ElevenLabs API key not found in environment variables")
         
