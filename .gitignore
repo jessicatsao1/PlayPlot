@@ -1,36 +1,52 @@
-# Environment variables
+# Ignore everything by default
+*
+!*/
+
+# Allow devnotes folder and its markdown files
+!devnotes/
+!devnotes/*.md
+
+# Allow manager agent related Python files
+!manager_agent.py
+!models.py
+!config.py
+!database.py
+!llm_factory.py
+!custom_llm_base.py
+!custom_llm_groq.py
+!custom_llm_mistral.py
+!test_manager.py
+
+# Allow requirements file
+!requirements.txt
+
+# Ignore specific directories
+backend/
+11labhackathon/
+fal.ai/
+__pycache__/
+.pytest_cache/
+.venv/
 .env
-.env.*
+frontend/
 
-# Dependencies
-/node_modules
-/.pnp
-.pnp.js
+# Ignore database files
+*.db
+*.sqlite
+*.sqlite3
 
-# Testing
-/coverage
-
-# Production build
-/build
-/dist
-/.next/
-/out/
-
-# Misc
-.DS_Store
-*.pem
-.idea/
-.vscode/
+# Ignore logs
 *.log
 
-# Debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Ignore environment files
+.env*
 
-# Local development
-*.local
+# Ignore IDE files
+.vscode/
+.idea/
+*.pyc
 
-# Cache
-.cache/
-.eslintcache 
+# Ignore test artifacts
+test-results/
+coverage/
+.coverage 
