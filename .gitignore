@@ -50,3 +50,7 @@ frontend/
 test-results/
 coverage/
 .coverage 
+!flowchart.png
+!playplot_demo.jpg
+/generated_videos/*
+!/generated_videos/.gitkeep
