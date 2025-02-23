@@ -67,7 +67,8 @@ class SpeechAgent:
         try:
             # Use LLM to analyze dialogue
             dialogue_analysis = self.llm_client.analyze_dialogue(scene_content)
-            
+            print(f"Dialogue analysis: {dialogue_analysis}")
+
             # Convert DialogueAnalysis objects to dictionary format
             dialogue_segments = []
             for analysis in dialogue_analysis:
@@ -200,7 +201,7 @@ class SpeechAgent:
         return min(max(base_duration, 0.3), 2.0)
 
     async def generate_scene_audio(self, voice_settings: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Generate audio segments for the entire scene
+        """Generate audio segments for the entire scene in parallel
         
         Args:
             voice_settings: Dictionary containing sequential dialogue settings
@@ -208,11 +209,11 @@ class SpeechAgent:
         Returns:
             List of audio segments with audio data and metadata in sequential order
         """
-        audio_segments = []
         sequence = voice_settings["sequence"]
+        print(f"Processing {len(sequence)} dialogue segments in parallel")
         
-        # Process each dialogue in sequence
-        for i, dialogue in enumerate(sequence):
+        async def generate_speech_segment(dialogue: Dict[str, Any], sequence_num: int) -> Dict[str, Any]:
+            """Generate a single speech segment asynchronously"""
             speaker = dialogue["speaker"]
             voice_id = self.character_voices.get(speaker, self.tts_client.voice_id)
             
@@ -223,24 +224,44 @@ class SpeechAgent:
                 **dialogue["settings"]
             )
             
-            audio_segments.append({
+            return {
                 "audio": audio_data,
                 "speaker": speaker,
                 "text": dialogue["text"],
                 "type": "dialogue",
                 "emotion": dialogue["emotion"],
                 "tone": dialogue.get("tone"),
-                "intensity": dialogue.get("intensity", 0.5)
-            })
+                "intensity": dialogue.get("intensity", 0.5),
+                "sequence_num": sequence_num  # Add sequence number for ordering
+            }
+        
+        # Create tasks for all dialogue segments
+        speech_tasks = []
+        for i, dialogue in enumerate(sequence):
+            task = asyncio.create_task(generate_speech_segment(dialogue, i))
+            speech_tasks.append(task)
+        
+        # Wait for all speech segments to be generated
+        speech_segments = await asyncio.gather(*speech_tasks)
+        
+        # Sort segments by sequence number
+        speech_segments.sort(key=lambda x: x["sequence_num"])
+        
+        # Build final audio segments list with pauses
+        audio_segments = []
+        for i, segment in enumerate(speech_segments):
+            # Add the speech segment
+            audio_segments.append(segment)
             
-            # Add dynamic pause after each dialogue (except the last one)
-            if i < len(sequence) - 1:
+            # Add pause if not the last segment
+            if i < len(speech_segments) - 1:
                 next_dialogue = sequence[i + 1]
-                pause_duration = self._calculate_pause_duration(dialogue, next_dialogue)
+                pause_duration = self._calculate_pause_duration(sequence[i], next_dialogue)
                 audio_segments.append({
                     "type": "pause",
                     "duration": pause_duration,
-                    "reason": f"Emotional transition: {dialogue['emotion']} ({dialogue['speaker']}) -> {next_dialogue['emotion']} ({next_dialogue['speaker']})"
+                    "sequence_num": i + 0.5,  # Use fractional sequence numbers for pauses
+                    "reason": f"Emotional transition: {segment['emotion']} ({segment['speaker']}) -> {next_dialogue['emotion']} ({next_dialogue['speaker']})"
                 })
         
         return audio_segments
@@ -275,27 +296,31 @@ class SpeechAgent:
                 try:
                     # Initialize combined audio
                     combined_audio = None
+                    segment_files = {}  # Store all segment files by sequence number
                     
-                    # Process each segment
-                    for i, segment in enumerate(audio_segments):
+                    # First pass: Save all dialogue segments to files
+                    for segment in audio_segments:
                         if segment["type"] == "dialogue" and isinstance(segment["audio"], BytesIO):
-                            # Save individual segment
-                            segment_path = f"{output_dir}/segment_{i}.mp3"
+                            sequence_num = segment["sequence_num"]
+                            segment_path = f"{output_dir}/segment_{sequence_num}.mp3"
                             with open(segment_path, "wb") as f:
                                 f.write(segment["audio"].getvalue())
                             segment["file_path"] = segment_path
-                            
+                            segment_files[sequence_num] = segment_path
+                    
+                    # Second pass: Combine audio in correct sequence
+                    sorted_segments = sorted(audio_segments, key=lambda x: x.get("sequence_num", 0))
+                    for segment in sorted_segments:
+                        if segment["type"] == "dialogue":
                             try:
-                                # Add to combined audio
-                                segment_audio = AudioSegment.from_file(segment_path, format="mp3")
-                                
+                                # Add dialogue segment
+                                segment_audio = AudioSegment.from_file(segment["file_path"], format="mp3")
                                 if combined_audio is None:
                                     combined_audio = segment_audio
                                 else:
-                                    combined_audio += AudioSegment.silent(duration=500)  # Add 0.5s pause
                                     combined_audio += segment_audio
                             except Exception as e:
-                                print(f"Warning: Failed to process segment {i}: {str(e)}")
+                                print(f"Warning: Failed to process segment {segment['sequence_num']}: {str(e)}")
                         
                         elif segment["type"] == "pause":
                             # Add pause between segments

@@ -3,7 +3,7 @@ import json
 import os
 from abc import ABC, abstractmethod
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class DialogueAnalysis(BaseModel):
     text: str
@@ -12,17 +12,30 @@ class DialogueAnalysis(BaseModel):
     context: str
     tone: Optional[str] = None
     intensity: Optional[float] = None
+    start_time: float = 0.0  # Start time in seconds
+    duration: float = 0.0    # Duration in seconds
 
 class BaseLLMClient(ABC):
     """Base class for LLM clients"""
     
+    MAX_TOTAL_DURATION = 5.0  # Maximum total duration in seconds
+    
+    def _estimate_duration(self, text: str, speaking_rate: float = 1.0) -> float:
+        """Estimate duration of spoken text in seconds.
+        Based on average speaking rate of 150 words per minute.
+        """
+        words = len(text.split())
+        # 150 words/minute = 2.5 words/second at rate 1.0
+        return (words / 2.5) / speaking_rate
+
     def _extract_dialogue_fallback(self, scene_content: str) -> List[DialogueAnalysis]:
         """Simple rule-based dialogue extraction as fallback"""
         dialogue_segments = []
+        current_time = 0.0
         lines = scene_content.split('\n')
         
         for line in lines:
-            if '"' not in line:
+            if '"' not in line or current_time >= self.MAX_TOTAL_DURATION:
                 continue
                 
             # Extract quoted text
@@ -32,6 +45,11 @@ class BaseLLMClient(ABC):
                 continue
                 
             text = line[quote_start + 1:quote_end]
+            
+            # Estimate duration and skip if it would exceed limit
+            estimated_duration = self._estimate_duration(text)
+            if current_time + estimated_duration > self.MAX_TOTAL_DURATION:
+                continue
             
             # Split line into before and after quote parts
             before_quote = line[:quote_start].lower()
@@ -45,7 +63,7 @@ class BaseLLMClient(ABC):
             if before_quote:
                 words = before_quote.split()
                 if words:
-                    speaker = words[0].title()  # First word is often the speaker
+                    speaker = words[0].title()
                     context = before_quote
             
             # Check for speaker after the quote if not found before
@@ -54,7 +72,7 @@ class BaseLLMClient(ABC):
                     if word.endswith("said") or word.endswith("asked"):
                         prev_words = after_quote.split()[:after_quote.split().index(word)]
                         if prev_words:
-                            speaker = prev_words[-1].title()  # Last word before "said/asked"
+                            speaker = prev_words[-1].title()
                             break
                 context = after_quote
             
@@ -87,14 +105,19 @@ class BaseLLMClient(ABC):
                 emotion = "confident"
                 intensity = 0.8
             
+            # Add segment with timing information
             dialogue_segments.append(DialogueAnalysis(
                 text=text,
                 speaker=speaker,
                 emotion=emotion,
                 context=full_context.strip(),
                 tone=tone,
-                intensity=intensity
+                intensity=intensity,
+                start_time=current_time,
+                duration=estimated_duration
             ))
+            
+            current_time += estimated_duration
         
         return dialogue_segments
 
@@ -128,18 +151,29 @@ class BaseLLMClient(ABC):
                     settings["speaking_rate"] = 1.2
                     settings["stability"] = 0.5
                 
+                # Ensure speaking rate is optimized for 5-second limit
+                text_length = len(dialogue.text.split())
+                if text_length > 8:  # If text is longer, increase rate
+                    settings["speaking_rate"] = min(settings["speaking_rate"] * 1.2, 2.0)
+                
                 recommendations[dialogue.speaker] = settings
         
         return recommendations
 
     def _get_analysis_prompt(self, scene_content: str) -> str:
         """Get the prompt for dialogue analysis"""
-        return f"""Analyze the following scene and extract all dialogue segments. For each dialogue:
+        return f"""Analyze the following scene and extract dialogue segments that can fit within a 5-second total duration.
+Choose the most important/impactful dialogues if not all can fit.
+
+For each dialogue segment:
 1. Identify the speaker
 2. Extract the exact dialogue text
 3. Determine the emotion and tone
 4. Note any relevant context
 5. Rate the emotional intensity (0.0-1.0)
+
+The total duration of all segments must not exceed 5 seconds.
+Assume average speaking rate of 2.5 words per second.
 
 Format the response as a JSON array of objects with fields:
 - text: The exact dialogue text
@@ -161,10 +195,15 @@ Scene:
         ])
         
         return f"""Based on the following dialogue segments, recommend voice settings for each speaker.
+Each segment must be deliverable within 5 seconds, so adjust speaking rates accordingly.
+
 Consider emotion, intensity, and context to suggest:
 1. Stability (0.0-1.0): Lower for more variation, higher for consistency
-2. Speaking rate (0.5-2.0): Adjust based on emotion and context
+2. Speaking rate (0.5-2.0): Adjust based on emotion and text length
 3. Similarity boost (0.0-1.0): How closely to match the base voice
+
+For longer segments (>8 words), increase the speaking rate while maintaining clarity.
+For emotional segments, balance speaking rate with emotional expression.
 
 Dialogue segments:
 {segments_text}
