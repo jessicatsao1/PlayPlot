@@ -70,9 +70,7 @@ class TaskAnalysis(BaseModel):
 
 class ComplianceResult(BaseModel):
     is_safe: bool
-    reasoning: str
-    concerns: Optional[List[str]] = []
-    suggestions: Optional[List[str]] = []
+    explanation: str
 
     class Config:
         json_encoders = {

@@ -108,7 +108,7 @@ class ManagerAgent:
             
             # Check compliance
             if not compliance_result["is_safe"]:
-                logger.warning(f"Content failed compliance check: {compliance_result['reasoning']}")
+                logger.warning(f"Content failed compliance check: {compliance_result['explanation']}")
                 return await self._handle_compliance_failure(task, compliance_result)
             
             # Process based on flow type
@@ -202,9 +202,7 @@ class ManagerAgent:
 
                 compliance_result = {
                     "is_safe": str(response_dict["is_safe"]).lower() in ["yes", "true"],
-                    "reasoning": response_dict.get("explanation", "No explanation provided"),
-                    "concerns": response_dict.get("concerns", []),
-                    "suggestions": response_dict.get("suggestions", [])
+                    "explanation": response_dict.get("explanation", "No explanation provided")
                 }
                 
                 logger.debug(f"Final compliance result: {json.dumps(compliance_result, indent=2)}")
@@ -318,7 +316,7 @@ class ManagerAgent:
             logger.debug(f"Processing compliance result: {json.dumps(compliance_result, indent=2)}")
             
             # If result is already in the correct format, use it directly
-            if isinstance(compliance_result, dict) and all(key in compliance_result for key in ["is_safe", "reasoning", "concerns", "suggestions"]):
+            if isinstance(compliance_result, dict) and all(key in compliance_result for key in ["is_safe", "explanation"]):
                 logger.debug("Compliance result already in correct format")
                 return compliance_result, kb_result
             
@@ -330,9 +328,7 @@ class ManagerAgent:
                 logger.warning("Empty compliance result content")
                 return {
                     "is_safe": True,
-                    "reasoning": "Default safe response - no content provided",
-                    "concerns": [],
-                    "suggestions": []
+                    "explanation": "Default safe response - no content provided"
                 }, kb_result
             
             # Try to parse as JSON
@@ -355,9 +351,7 @@ class ManagerAgent:
                 
                 processed_result = {
                     "is_safe": is_safe,
-                    "reasoning": response_dict.get("explanation", "No explanation provided"),
-                    "concerns": response_dict.get("concerns", []),
-                    "suggestions": response_dict.get("suggestions", [])
+                    "explanation": response_dict.get("explanation", "No explanation provided")
                 }
                 
                 logger.debug(f"Final processed compliance result: {json.dumps(processed_result, indent=2)}")
@@ -371,9 +365,7 @@ class ManagerAgent:
                 
                 fallback_result = {
                     "is_safe": is_safe,
-                    "reasoning": str(content),
-                    "concerns": [],
-                    "suggestions": []
+                    "explanation": str(content)
                 }
                 
                 logger.debug(f"Fallback compliance result: {json.dumps(fallback_result, indent=2)}")
@@ -384,9 +376,7 @@ class ManagerAgent:
             logger.error(f"Raw compliance result: {compliance_result}")
             return {
                 "is_safe": True,
-                "reasoning": f"Failed to process compliance result: {str(e)}",
-                "concerns": [],
-                "suggestions": []
+                "explanation": f"Failed to process compliance result: {str(e)}"
             }, kb_result
         
     async def _handle_compliance_failure(
@@ -399,8 +389,7 @@ class ManagerAgent:
         task.metadata["failure_reason"] = "compliance_check_failed"
         return {
             "status": "rejected",
-            "reason": compliance_result["reasoning"],
-            "suggestions": compliance_result.get("suggestions", []),
+            "reason": compliance_result["explanation"],
             "task_id": task.task_id
         }
         

@@ -60,6 +60,47 @@ class ResponseValidator:
             raise LLMValidationError(str(e))
 
     @staticmethod
+    def validate_model_selection(content: str) -> Dict[str, Any]:
+        """Validate and parse model selection response"""
+        try:
+            # Remove any markdown formatting
+            content = re.sub(r'```json\s*|\s*```', '', content)
+            result = json.loads(content)
+            
+            # Required fields
+            required_fields = ["checkpoint", "lora"]
+            
+            # Validate required fields
+            for field in required_fields:
+                if field not in result:
+                    raise LLMValidationError(f"Missing required field: {field}")
+                    
+                # Validate field is a non-empty string
+                if not isinstance(result[field], str):
+                    raise LLMValidationError(f"Field '{field}' must be a string")
+                if not result[field].strip():
+                    raise LLMValidationError(f"Field '{field}' cannot be empty")
+                    
+            # Validate checkpoint type
+            if result["checkpoint"] not in ["realistic", "anime"]:
+                raise LLMValidationError("Checkpoint must be either 'realistic' or 'anime'")
+                
+            # Validate lora type
+            if result["lora"] not in ["realistic", "anime"]:
+                raise LLMValidationError("LoRA must be either 'realistic' or 'anime'")
+                
+            return result
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse model selection JSON: {str(e)}")
+            logger.error(f"Raw content: {content}")
+            raise LLMValidationError(f"Invalid JSON format in model selection response: {str(e)}")
+        except Exception as e:
+            logger.error(f"Model selection validation failed: {str(e)}")
+            logger.error(f"Raw content: {content}")
+            raise LLMValidationError(str(e))
+
+    @staticmethod
     def validate_compliance_check(content: str) -> Dict[str, Any]:
         """Validate and parse compliance check response"""
         try:
@@ -67,34 +108,31 @@ class ResponseValidator:
             content = re.sub(r'```json\s*|\s*```', '', content)
             result = json.loads(content)
             
-            # Required fields and their types
-            schema = {
-                "is_safe": str,
-                "explanation": str,
-                "concerns": list,
-                "suggestions": list
-            }
+            # Required fields
+            required_fields = ["is_safe", "explanation"]
             
-            # Validate required fields and their types
-            for field, field_type in schema.items():
+            # Validate required fields
+            for field in required_fields:
                 if field not in result:
                     raise LLMValidationError(f"Missing required field: {field}")
-                if not isinstance(result[field], field_type):
-                    raise LLMValidationError(f"Field '{field}' must be of type {field_type.__name__}")
-                # Only check for empty fields on is_safe and explanation
-                if field in ["is_safe", "explanation"] and not result[field]:
-                    raise LLMValidationError(f"Empty field: {field}")
-            
-            # Validate is_safe values
-            if result["is_safe"].lower() not in ["yes", "no"]:
-                raise LLMValidationError("Field 'is_safe' must be 'yes' or 'no'")
+                    
+            # Validate field types
+            if not isinstance(result["is_safe"], str):
+                raise LLMValidationError("Field 'is_safe' must be a string")
+            if not isinstance(result["explanation"], str):
+                raise LLMValidationError("Field 'explanation' must be a string")
                 
-            # Validate array fields
-            for field in ["concerns", "suggestions"]:
-                if not all(isinstance(item, str) for item in result[field]):
-                    raise LLMValidationError(f"All items in '{field}' must be strings")
+            # Convert is_safe to boolean
+            is_safe = str(result["is_safe"]).lower() in ["yes", "true"]
             
-            return result
+            # Validate content length
+            if len(result["explanation"].strip()) < 50:
+                raise LLMValidationError("Field 'explanation' must contain a detailed explanation (at least 50 characters)")
+                
+            return {
+                "is_safe": is_safe,
+                "explanation": result["explanation"]
+            }
             
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse compliance check JSON: {str(e)}")
@@ -102,6 +140,43 @@ class ResponseValidator:
             raise LLMValidationError(f"Invalid JSON format in compliance check response: {str(e)}")
         except Exception as e:
             logger.error(f"Compliance check validation failed: {str(e)}")
+            logger.error(f"Raw content: {content}")
+            raise LLMValidationError(str(e))
+
+    @staticmethod
+    def validate_image_prompt(content: str) -> Dict[str, Any]:
+        """Validate and parse image prompt response"""
+        try:
+            # Remove any markdown formatting
+            content = re.sub(r'```json\s*|\s*```', '', content)
+            result = json.loads(content)
+            
+            # Required fields
+            required_fields = ["prompt", "negative_prompt"]
+            
+            # Validate required fields
+            for field in required_fields:
+                if field not in result:
+                    raise LLMValidationError(f"Missing required field: {field}")
+                    
+            # Validate field types
+            if not isinstance(result["prompt"], str):
+                raise LLMValidationError("Field 'prompt' must be a string")
+            if not isinstance(result["negative_prompt"], str):
+                raise LLMValidationError("Field 'negative_prompt' must be a string")
+                
+            # Validate content length
+            if len(result["prompt"].strip()) < 50:
+                raise LLMValidationError("Field 'prompt' must contain a detailed description (at least 50 characters)")
+                
+            return result
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse image prompt JSON: {str(e)}")
+            logger.error(f"Raw content: {content}")
+            raise LLMValidationError(f"Invalid JSON format in image prompt response: {str(e)}")
+        except Exception as e:
+            logger.error(f"Image prompt validation failed: {str(e)}")
             logger.error(f"Raw content: {content}")
             raise LLMValidationError(str(e))
 
@@ -174,6 +249,10 @@ class LLMManager:
                 content = self.validator.validate_story_analysis(content)
             elif response_type == "compliance_check":
                 content = self.validator.validate_compliance_check(content)
+            elif response_type == "image_prompt":
+                content = self.validator.validate_image_prompt(content)
+            elif response_type == "model_selection":
+                content = self.validator.validate_model_selection(content)
             
             return {
                 "content": content,
@@ -181,8 +260,8 @@ class LLMManager:
                 "usage": result.get("usage", {})
             }
             
-        except Exception as e:
-            logger.error(f"Primary model failed: {str(e)}")
+        except Exception as primary_error:
+            logger.error(f"Primary model failed: {str(primary_error)}")
             
             # Try fallback model
             try:
@@ -196,13 +275,17 @@ class LLMManager:
                     raise LLMError(f"Unsupported fallback provider: {config['fallback']['provider']}")
                 
                 content = result["choices"][0]["message"]["content"]
-                logger.debug(f"Raw fallback response:\n{content}")
+                logger.debug(f"Raw LLM fallback response:\n{content}")
                 
                 # Validate response based on type
                 if response_type == "story_analysis":
                     content = self.validator.validate_story_analysis(content)
                 elif response_type == "compliance_check":
                     content = self.validator.validate_compliance_check(content)
+                elif response_type == "image_prompt":
+                    content = self.validator.validate_image_prompt(content)
+                elif response_type == "model_selection":
+                    content = self.validator.validate_model_selection(content)
                 
                 return {
                     "content": content,
@@ -210,9 +293,9 @@ class LLMManager:
                     "usage": result.get("usage", {})
                 }
                 
-            except Exception as e2:
-                logger.error(f"Fallback model failed: {str(e2)}")
-                raise LLMError(f"Both primary and fallback models failed: {str(e)} | {str(e2)}")
+            except Exception as fallback_error:
+                logger.error(f"Fallback model failed: {str(fallback_error)}")
+                raise LLMError(f"Both primary and fallback models failed. Primary: {str(primary_error)}. Fallback: {str(fallback_error)}")
 
     async def _call_groq(
         self,

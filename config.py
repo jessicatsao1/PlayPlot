@@ -91,9 +91,7 @@ PROMPT_TEMPLATES = {
     You MUST return your response in the following JSON format ONLY:
     {{
         "is_safe": "yes" or "no",
-        "explanation": "Detailed explanation of compliance analysis",
-        "concerns": ["List of specific concerns if any"],
-        "suggestions": ["List of suggestions for improvement if needed"]
+        "explanation": "Detailed explanation of compliance analysis"
     }}
 
     Do not include any other text, markdown formatting, or additional content.
