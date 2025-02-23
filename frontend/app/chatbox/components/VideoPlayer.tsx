@@ -19,11 +19,25 @@ interface VideoPlayerProps {
   };
   timestamp: string;
   description?: string;
+  onUpdate: (newData: {
+    media?: {
+      video?: {
+        url: string;
+        thumbnail_url: string;
+        duration: number;
+        metadata: {
+          resolution: string;
+          fps: number;
+          format: string;
+        };
+      };
+    };
+  }) => void;
 }
 
 const MAX_LENGTH = 75;
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ media, timestamp, description }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ media, timestamp, description, onUpdate }) => {
   const { video } = media;
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -48,6 +62,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ media, timestamp, description
         videoRef.current.play();
       }
       setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleRegenerate = async () => {
+    try {
+      const params = {};
+      const response = await fetch('YOUR_API_ENDPOINT', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params)
+      });
+      const data = await response.json();
+      onUpdate(data);
+    } catch (error) {
+      console.error('Error calling API:', error);
     }
   };
 
@@ -100,7 +131,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ media, timestamp, description
             onClick={handlePlayPause}
             className="text-white/70 hover:text-white p-0"
           >
-            {isPlaying ? <Pause size={24} className="text-white" /> : <Play size={24} className="text-white" />}
+            {isPlaying ? <Pause size={24} className="text-white"/> : <Play size={24} className="text-white"/>}
           </Button>
         </div>
         {
@@ -135,6 +166,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ media, timestamp, description
         <Button
           variant="ghost"
           className="flex-1 px-3 py-2 text-xs bg-muted-foreground/10 hover:bg-muted-foreground/20"
+          onClick={handleRegenerate}
         >
           Regenerate
         </Button>

@@ -77,6 +77,18 @@ export default function Page() {
     {id: '3', label: 'Step 3', value: 'Step 3'},
   ]);
 
+  // 添加更新消息的方法
+  const handleMessageUpdate = (index: number, newData: any) => {
+    setMessages(prevMessages => {
+      const updatedMessages = [...prevMessages];
+      updatedMessages[index] = {
+        ...updatedMessages[index],
+        ...newData
+      };
+      return updatedMessages;
+    });
+  };
+
   return (
     <div>
       {firstIn ? (
@@ -109,6 +121,7 @@ export default function Page() {
                                   }}
                                   timestamp={msg.timestamp}
                                   description={msg.text || ''}
+                                  onUpdate={(newData) => handleMessageUpdate(index, newData)}
                                 />
                               ) : (
                                 <ImagePlayer
@@ -129,6 +142,7 @@ export default function Page() {
                                   }}
                                   timestamp={msg.timestamp}
                                   description={msg.text || ''}
+                                  onUpdate={(newData) => handleMessageUpdate(index, newData)}
                                 />
                               )}
                             </div>
