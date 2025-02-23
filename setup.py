@@ -1,4 +1,23 @@
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Command
+from setuptools.command.install import install
+import subprocess
+import sys
+
+class CustomInstallCommand(install):
+    """Custom installation command that checks for ffmpeg."""
+    def run(self):
+        # Run the standard installation
+        install.run(self)
+        
+        # Import and run ffmpeg check
+        try:
+            from src.utils.setup_utils import check_ffmpeg
+            if not check_ffmpeg():
+                print("Warning: ffmpeg installation failed. Please install it manually.")
+                print("The package will still work, but audio processing features will be limited.")
+        except Exception as e:
+            print(f"Warning: Could not verify ffmpeg installation: {str(e)}")
+            print("Please ensure ffmpeg is installed manually if you plan to use audio features.")
 
 setup(
     name="playplot",
@@ -21,4 +40,7 @@ setup(
         "typing-extensions>=4.5.0"
     ],
     python_requires=">=3.8",
+    cmdclass={
+        'install': CustomInstallCommand,
+    },
 ) 
