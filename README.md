@@ -19,7 +19,7 @@ OPENAI_API_KEY=your_openai_api_key
 ELEVENLABS_API_KEY=your_elevenlabs_api_key
 PERPLEXITY_API_KEY=your_perplexity_api_key
 GROQ_API_KEY=your_groq_api_key
-FAL_KEY=your_fal_api_key
+FAL_API_KEY=your_fal_api_key
 ```
 
 ## Installation
