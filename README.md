@@ -13,7 +13,7 @@ PlayPlot is an interactive storytelling platform that combines AI-generated narr
 - pip (Python package manager)
 
 ### API Keys Required
-The following API keys need to be set up in the `backend/.env` file:
+The following API keys need to be set up in the `backend/.env` file and `frontend/.env`:
 ```env
 OPENAI_API_KEY=your_openai_api_key
 ELEVENLABS_API_KEY=your_elevenlabs_api_key
