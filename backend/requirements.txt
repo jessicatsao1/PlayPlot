@@ -1,0 +1,11 @@
+python-dotenv>=1.0.0
+requests>=2.31.0
+pydub>=0.25.1
+aiohttp>=3.8.0
+elevenlabs>=0.2.27
+pydantic>=2.0.0
+groq>=0.3.2
+mistralai>=0.0.12
+pytest>=8.0.0
+pytest-asyncio>=0.25.0
+pytest-cov>=4.1.0
